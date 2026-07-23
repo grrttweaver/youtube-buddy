@@ -274,6 +274,10 @@ QMainWindow {
     background-color: transparent;
 }
 
+QWidget#selectionToolbar {
+    background-color: #1a1b26;
+}
+
 QLabel#setupTitle {
     font-size: 18px;
     font-weight: 600;
@@ -413,6 +417,10 @@ QTableView {
 QTableView::item {
     padding: 6px 8px;
     border: none;
+}
+
+QHeaderView {
+    background-color: #1f2335;
 }
 
 QHeaderView::section {
