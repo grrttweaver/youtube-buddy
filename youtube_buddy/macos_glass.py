@@ -19,6 +19,7 @@ def apply_macos_glass(window: QMainWindow) -> None:
 
     try:
         import pyqt_liquidglass as glass
+        from pyqt_liquidglass._bridge import get_nswindow_from_widget
     except ImportError:
         window.show()
         return
@@ -26,3 +27,7 @@ def apply_macos_glass(window: QMainWindow) -> None:
     glass.prepare_window_for_glass(window)
     glass.apply_glass_to_window(window)
     glass.setup_traffic_lights_inset(window, x_offset=16, y_offset=14)
+
+    ns_window = get_nswindow_from_widget(window)
+    if ns_window is not None:
+        ns_window.setMovableByWindowBackground_(True)  # ty: ignore

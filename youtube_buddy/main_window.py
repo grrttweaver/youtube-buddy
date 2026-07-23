@@ -13,6 +13,7 @@ from PyQt6.QtGui import (
     QDropEvent,
     QImage,
     QKeySequence,
+    QMouseEvent,
     QPixmap,
     QResizeEvent,
 )
@@ -62,6 +63,23 @@ from youtube_buddy.media_urls import (
 )
 
 
+class TitleDragRegion(QWidget):
+    """Top strip for dragging the glass window without hitting controls."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedHeight(28)
+        self.setCursor(Qt.CursorShape.OpenHandCursor)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            window_handle = self.window().windowHandle()
+            if window_handle is not None and window_handle.startSystemMove():
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, database: Database) -> None:
         super().__init__()
@@ -86,8 +104,11 @@ class MainWindow(QMainWindow):
         if sys.platform == "darwin":
             self._central.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         layout = QVBoxLayout(self._central)
-        top_margin = 36 if sys.platform == "darwin" else 20
-        layout.setContentsMargins(20, top_margin, 20, 16)
+        if sys.platform == "darwin":
+            layout.setContentsMargins(20, 8, 20, 16)
+            layout.addWidget(TitleDragRegion(self._central))
+        else:
+            layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(16)
 
         input_row = QHBoxLayout()
@@ -145,6 +166,14 @@ class MainWindow(QMainWindow):
         self.table.setIconSize(QSize(112, 63))
         self.table.setWordWrap(True)
 
+        if sys.platform == "darwin":
+            self.table.viewport().setAttribute(
+                Qt.WidgetAttribute.WA_OpaquePaintEvent, True
+            )
+            self.table.horizontalHeader().viewport().setAttribute(
+                Qt.WidgetAttribute.WA_OpaquePaintEvent, True
+            )
+
         self.row_delegate = RowHoverDelegate(self.table)
         self.table.setItemDelegateForColumn(COL_THUMBNAIL, self.row_delegate)
         self.table.setItemDelegateForColumn(COL_LENGTH, self.row_delegate)
@@ -193,7 +222,11 @@ class MainWindow(QMainWindow):
         self._load_thumbnails_for_all()
 
     def _build_menu(self) -> None:
-        self._file_menu = self.menuBar().addMenu("&File")
+        menu_bar = self.menuBar()
+        if sys.platform == "darwin":
+            menu_bar.setNativeMenuBar(True)
+
+        self._file_menu = menu_bar.addMenu("&File")
 
         open_action = self._file_menu.addAction("&Open Database…")
         open_action.setShortcut(QKeySequence.StandardKey.Open)
@@ -287,6 +320,8 @@ class MainWindow(QMainWindow):
         self._update_selection_toolbar()
         self._load_thumbnails_for_all()
         self._rebuild_recent_menu()
+        self.table.viewport().repaint()
+        self.table.horizontalHeader().viewport().repaint()
         self._set_status(f"{len(self.model.videos())} videos in playlist")
 
     def _confirm_cancel_imports(self) -> bool:

@@ -7,7 +7,7 @@ from PyQt6.QtGui import QColor, QPainter, QPalette
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
 
 from youtube_buddy.database import Video
-from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, RowHoverDelegate
+from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, RowHoverDelegate, paint_item_background
 
 BADGE_PADDING_H = 6
 BADGE_PADDING_V = 2
@@ -40,6 +40,7 @@ class TitleDelegate(RowHoverDelegate):
         index: QModelIndex,
     ) -> None:
         table = option.widget
+        paint_item_background(painter, option, index)
         if isinstance(table, HoverTableView) and index.row() == table.hover_row:
             painter.fillRect(option.rect, HOVER_COLOR)
 

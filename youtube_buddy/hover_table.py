@@ -6,7 +6,13 @@ import sys
 
 from PyQt6.QtCore import QModelIndex, Qt
 from PyQt6.QtGui import QColor, QMouseEvent, QPainter
-from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QTableView
+from PyQt6.QtWidgets import (
+    QApplication,
+    QStyle,
+    QStyleOptionViewItem,
+    QStyledItemDelegate,
+    QTableView,
+)
 
 
 HOVER_COLOR = (
@@ -14,6 +20,25 @@ HOVER_COLOR = (
     if sys.platform == "darwin"
     else QColor("#2a3150")
 )
+
+_ITEM_BACKGROUND_DELEGATE = QStyledItemDelegate()
+
+
+def paint_item_background(
+    painter: QPainter,
+    option: QStyleOptionViewItem,
+    index: QModelIndex,
+) -> None:
+    item_option = QStyleOptionViewItem(option)
+    _ITEM_BACKGROUND_DELEGATE.initStyleOption(item_option, index)
+    widget = option.widget
+    style = widget.style() if widget else QApplication.style()
+    style.drawPrimitive(
+        QStyle.PrimitiveElement.PE_PanelItemViewItem,
+        item_option,
+        painter,
+        widget,
+    )
 
 
 class HoverTableView(QTableView):
@@ -67,6 +92,7 @@ class RowHoverDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index: QModelIndex,
     ) -> None:
+        paint_item_background(painter, option, index)
         table = option.widget
         if isinstance(table, HoverTableView) and index.row() == table.hover_row:
             painter.save()

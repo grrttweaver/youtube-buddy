@@ -401,8 +401,8 @@ QWidget#importQueueRow[failed="true"] QLabel#importQueueText {
 }
 
 QTableView {
-    background-color: rgba(36, 40, 59, 0.52);
-    alternate-background-color: rgba(31, 35, 53, 0.42);
+    background-color: #24283b;
+    alternate-background-color: #1f2335;
     border: 1px solid rgba(65, 72, 104, 0.55);
     border-radius: 10px;
     gridline-color: rgba(50, 54, 74, 0.5);
@@ -416,7 +416,7 @@ QTableView::item {
 }
 
 QHeaderView::section {
-    background-color: rgba(31, 35, 53, 0.62);
+    background-color: #1f2335;
     color: #7aa2f7;
     padding: 10px 8px;
     border: none;
