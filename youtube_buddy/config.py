@@ -84,6 +84,34 @@ def remove_recent_database(path: Path) -> None:
     save_config(config)
 
 
+def replace_database_path(old: Path, new: Path) -> None:
+    old_resolved = old.resolve()
+    new_resolved = new.resolve()
+    if old_resolved == new_resolved:
+        return
+
+    config = load_config()
+
+    stored = config.get("database_path")
+    if stored and Path(stored).resolve() == old_resolved:
+        config["database_path"] = str(new_resolved)
+
+    recent: list[str] = []
+    seen: set[str] = set()
+    for item in config.get("recent_database_paths", []):
+        if not item:
+            continue
+        item_path = Path(item)
+        updated = str(new_resolved) if item_path.resolve() == old_resolved else item
+        if updated in seen:
+            continue
+        seen.add(updated)
+        recent.append(updated)
+
+    config["recent_database_paths"] = recent
+    save_config(config)
+
+
 def get_window_geometry() -> bytes | None:
     value = load_config().get("window_geometry")
     if not isinstance(value, str) or not value:

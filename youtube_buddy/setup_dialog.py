@@ -18,6 +18,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from youtube_buddy.database import (
+    DATABASE_OPEN_FILTER,
+    DATABASE_SAVE_FILTER,
+    default_database_path,
+    ensure_database_suffix,
+    migrate_legacy_database,
+)
+
 
 class SetupDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -79,7 +87,7 @@ class SetupDialog(QDialog):
 
     def _update_default_path(self) -> None:
         if self.new_radio.isChecked() and not self.path_input.text():
-            default = Path.home() / "youtube-buddy-playlist.db"
+            default = default_database_path()
             self.path_input.setText(str(default))
             self._database_path = default
         self.status_label.setText("")
@@ -89,15 +97,15 @@ class SetupDialog(QDialog):
             path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Create Playlist Database",
-                str(Path.home() / "youtube-buddy-playlist.db"),
-                "SQLite Database (*.db);;All Files (*)",
+                str(default_database_path()),
+                DATABASE_SAVE_FILTER,
             )
         else:
             path, _ = QFileDialog.getOpenFileName(
                 self,
                 "Open Playlist Database",
                 str(Path.home()),
-                "SQLite Database (*.db);;All Files (*)",
+                DATABASE_OPEN_FILTER,
             )
 
         if path:
@@ -118,6 +126,9 @@ class SetupDialog(QDialog):
 
         if self.new_radio.isChecked():
             path.parent.mkdir(parents=True, exist_ok=True)
+            path = ensure_database_suffix(path)
+        else:
+            path = migrate_legacy_database(path)
 
         self._database_path = path
         self.accept()

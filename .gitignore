@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.db
+*.ytbud
 .DS_Store
 build/
 dist/

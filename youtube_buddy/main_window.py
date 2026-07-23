@@ -41,7 +41,15 @@ from youtube_buddy.config import (
     remove_recent_database,
     set_window_geometry,
 )
-from youtube_buddy.database import Database, Video
+from youtube_buddy.database import (
+    DATABASE_OPEN_FILTER,
+    DATABASE_SAVE_FILTER,
+    Database,
+    Video,
+    default_database_path,
+    ensure_database_suffix,
+    migrate_legacy_database,
+)
 from youtube_buddy.drop_overlay import DropOverlay
 from youtube_buddy.import_queue import ImportQueueWidget
 from youtube_buddy.hover_table import HoverTableView, RowHoverDelegate
@@ -272,7 +280,7 @@ class MainWindow(QMainWindow):
             self,
             "Open Playlist Database",
             str(self.database.path.parent),
-            "SQLite Database (*.db);;All Files (*)",
+            DATABASE_OPEN_FILTER,
         )
         if path:
             self._open_database_at(Path(path))
@@ -281,18 +289,18 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Create Playlist Database",
-            str(Path.home() / "youtube-buddy-playlist.db"),
-            "SQLite Database (*.db);;All Files (*)",
+            str(default_database_path()),
+            DATABASE_SAVE_FILTER,
         )
         if not path:
             return
 
-        db_path = Path(path)
+        db_path = ensure_database_suffix(Path(path))
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._open_database_at(db_path)
 
     def _open_database_at(self, path: Path) -> None:
-        resolved = path.resolve()
+        resolved = migrate_legacy_database(path.resolve())
         if resolved == self.database.path.resolve():
             return
 
