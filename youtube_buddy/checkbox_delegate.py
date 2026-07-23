@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionViewItem,
 )
 
-from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView
+from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, paint_item_background
 
 
 class CheckboxDelegate(QStyledItemDelegate):
@@ -24,6 +24,7 @@ class CheckboxDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index,
     ) -> None:
+        paint_item_background(painter, option, index)
         table = option.widget
         if isinstance(table, HoverTableView) and index.row() == table.hover_row:
             painter.fillRect(option.rect, HOVER_COLOR)

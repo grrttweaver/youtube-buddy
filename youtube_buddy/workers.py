@@ -71,6 +71,17 @@ class ThumbnailLoader:
             if worker.isRunning():
                 worker.wait(timeout_ms)
 
+    def clear(self, timeout_ms: int = 2000) -> None:
+        self._queue.clear()
+        for worker in list(self._active_workers):
+            worker.loaded.disconnect()
+            worker.failed.disconnect()
+            worker.finished.disconnect()
+            if worker.isRunning():
+                worker.wait(timeout_ms)
+            worker.deleteLater()
+        self._active_workers.clear()
+
     def _start_pending(self) -> None:
         while self._queue and len(self._active_workers) < MAX_CONCURRENT_THUMBNAILS:
             video_id, url = self._queue.popleft()

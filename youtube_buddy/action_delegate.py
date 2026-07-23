@@ -6,7 +6,7 @@ from PyQt6.QtCore import QEvent, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent, QPainter
 from PyQt6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
-from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView
+from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, paint_item_background
 
 
 class ActionButtonDelegate(QStyledItemDelegate):
@@ -23,6 +23,7 @@ class ActionButtonDelegate(QStyledItemDelegate):
         if not index.isValid():
             return
 
+        paint_item_background(painter, option, index)
         table = option.widget
         if isinstance(table, HoverTableView) and index.row() == table.hover_row:
             painter.fillRect(option.rect, HOVER_COLOR)

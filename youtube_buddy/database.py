@@ -6,6 +6,68 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+DATABASE_SUFFIX = ".ytbud"
+LEGACY_DATABASE_SUFFIX = ".db"
+DEFAULT_DATABASE_NAME = f"youtube-buddy-playlist{DATABASE_SUFFIX}"
+
+DATABASE_OPEN_FILTER = (
+    f"YouTube Buddy Playlist (*{DATABASE_SUFFIX});;"
+    f"Legacy Playlist (*{LEGACY_DATABASE_SUFFIX});;"
+    "All Files (*)"
+)
+DATABASE_SAVE_FILTER = (
+    f"YouTube Buddy Playlist (*{DATABASE_SUFFIX});;All Files (*)"
+)
+
+
+def default_database_path() -> Path:
+    return Path.home() / DEFAULT_DATABASE_NAME
+
+
+def ensure_database_suffix(path: Path) -> Path:
+    suffix = path.suffix.lower()
+    if suffix in {DATABASE_SUFFIX, LEGACY_DATABASE_SUFFIX}:
+        return path
+    return path.with_suffix(DATABASE_SUFFIX)
+
+
+def is_legacy_database(path: Path) -> bool:
+    return path.suffix.lower() == LEGACY_DATABASE_SUFFIX
+
+
+def migrate_legacy_database(path: Path) -> Path:
+    """Rename a legacy .db playlist to .ytbud and update stored paths."""
+    resolved = path.resolve()
+    if not is_legacy_database(resolved):
+        return resolved
+
+    target = resolved.with_suffix(DATABASE_SUFFIX)
+    if not target.exists():
+        resolved.rename(target)
+
+    from youtube_buddy.config import replace_database_path
+
+    replace_database_path(resolved, target)
+    return target
+
+
+def migrate_stored_database_paths() -> None:
+    """Convert any legacy .db paths saved in config."""
+    from youtube_buddy.config import get_database_path, get_recent_database_paths
+
+    candidates: list[Path] = []
+    if current := get_database_path():
+        candidates.append(current)
+    candidates.extend(get_recent_database_paths())
+
+    seen: set[Path] = set()
+    for path in candidates:
+        resolved = path.resolve()
+        if resolved in seen or not resolved.exists() or not is_legacy_database(resolved):
+            continue
+        seen.add(resolved)
+        migrate_legacy_database(resolved)
+
 
 @dataclass
 class Video:

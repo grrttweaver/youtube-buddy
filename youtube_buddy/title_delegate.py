@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtCore import QModelIndex, QRect, Qt
 from PyQt6.QtGui import QColor, QPainter, QPalette
 from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
 
 from youtube_buddy.database import Video
-from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, RowHoverDelegate
+from youtube_buddy.hover_table import HOVER_COLOR, HoverTableView, RowHoverDelegate, paint_item_background
 
 BADGE_PADDING_H = 6
 BADGE_PADDING_V = 2
@@ -40,37 +42,44 @@ class TitleDelegate(RowHoverDelegate):
         index: QModelIndex,
     ) -> None:
         table = option.widget
+        paint_item_background(painter, option, index)
         if isinstance(table, HoverTableView) and index.row() == table.hover_row:
             painter.fillRect(option.rect, HOVER_COLOR)
 
-        video = index.data(Qt.ItemDataRole.UserRole)
-        title = index.data(Qt.ItemDataRole.DisplayRole)
-        if not isinstance(title, str):
-            title = "Loading…"
+        painter.save()
+        painter.setClipRect(option.rect)
 
-        if isinstance(video, Video):
-            if video.is_playlist:
-                self._paint_badged_title(
-                    painter, option, title, "PLST", PLST_BADGE_BG, PLST_BADGE_FG
-                )
-                return
-            if video.is_short:
-                self._paint_badged_title(
-                    painter, option, title, "SHRT", SHRT_BADGE_BG, SHRT_BADGE_FG
-                )
-                return
-            if video.platform == "instagram":
-                self._paint_badged_title(
-                    painter, option, title, "IGRL", IGRL_BADGE_BG, IGRL_BADGE_FG
-                )
-                return
-            if video.platform == "facebook":
-                self._paint_badged_title(
-                    painter, option, title, "FBRL", FBRL_BADGE_BG, FBRL_BADGE_FG
-                )
-                return
+        try:
+            video = index.data(Qt.ItemDataRole.UserRole)
+            title = index.data(Qt.ItemDataRole.DisplayRole)
+            if not isinstance(title, str):
+                title = "Loading…"
 
-        self._paint_wrapped_title(painter, option, title)
+            if isinstance(video, Video):
+                if video.is_playlist:
+                    self._paint_badged_title(
+                        painter, option, title, "PLST", PLST_BADGE_BG, PLST_BADGE_FG
+                    )
+                    return
+                if video.is_short:
+                    self._paint_badged_title(
+                        painter, option, title, "SHRT", SHRT_BADGE_BG, SHRT_BADGE_FG
+                    )
+                    return
+                if video.platform == "instagram":
+                    self._paint_badged_title(
+                        painter, option, title, "IGRL", IGRL_BADGE_BG, IGRL_BADGE_FG
+                    )
+                    return
+                if video.platform == "facebook":
+                    self._paint_badged_title(
+                        painter, option, title, "FBRL", FBRL_BADGE_BG, FBRL_BADGE_FG
+                    )
+                    return
+
+            self._paint_wrapped_title(painter, option, title)
+        finally:
+            painter.restore()
 
     def _text_color(self, option: QStyleOptionViewItem) -> QColor:
         if option.state & QStyle.StateFlag.State_Selected:
@@ -88,7 +97,8 @@ class TitleDelegate(RowHoverDelegate):
         title: str,
     ) -> None:
         painter.save()
-        self._paint_selection(painter, option)
+        if sys.platform != "darwin":
+            self._paint_selection(painter, option)
         painter.setFont(option.font)
         painter.setPen(self._text_color(option))
 
@@ -112,7 +122,8 @@ class TitleDelegate(RowHoverDelegate):
     ) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self._paint_selection(painter, option)
+        if sys.platform != "darwin":
+            self._paint_selection(painter, option)
 
         font = option.font
         painter.setFont(font)
