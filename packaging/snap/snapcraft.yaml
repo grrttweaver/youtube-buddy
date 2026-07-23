@@ -1,0 +1,30 @@
+name: youtube-buddy
+title: YouTube Buddy
+summary: Manage an offline playlist of video links
+description: |
+  YouTube Buddy is a desktop app for collecting and organizing YouTube videos,
+  Shorts, playlists, and select Instagram and Facebook Reels in one offline list.
+
+version: "0.1.0"
+grade: stable
+confinement: strict
+base: core22
+
+apps:
+  youtube-buddy:
+    command: youtube-buddy
+    extensions: [gnome]
+    plugs:
+      - network
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - home
+      - removable-media
+
+parts:
+  youtube-buddy:
+    plugin: dump
+    source: ../../snap/dist
+    stage-packages: []
