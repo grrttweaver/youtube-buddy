@@ -10,6 +10,7 @@ from platformdirs import user_config_dir
 
 APP_NAME = "youtube-buddy"
 CONFIG_FILENAME = "config.json"
+MAX_RECENT_DATABASES = 5
 
 
 def config_dir() -> Path:
@@ -43,7 +44,43 @@ def get_database_path() -> Path | None:
 
 def set_database_path(path: Path) -> None:
     config = load_config()
-    config["database_path"] = str(path)
+    config["database_path"] = str(path.resolve())
+    save_config(config)
+
+
+def get_recent_database_paths(*, existing_only: bool = False) -> list[Path]:
+    paths = [
+        Path(value)
+        for value in load_config().get("recent_database_paths", [])
+        if value
+    ]
+    if existing_only:
+        paths = [path for path in paths if path.exists()]
+    return paths[:MAX_RECENT_DATABASES]
+
+
+def remember_database(path: Path) -> None:
+    resolved = str(path.resolve())
+    config = load_config()
+    recent = [
+        item
+        for item in config.get("recent_database_paths", [])
+        if item and item != resolved
+    ]
+    recent.insert(0, resolved)
+    config["recent_database_paths"] = recent[:MAX_RECENT_DATABASES]
+    config["database_path"] = resolved
+    save_config(config)
+
+
+def remove_recent_database(path: Path) -> None:
+    resolved = str(path.resolve())
+    config = load_config()
+    config["recent_database_paths"] = [
+        item
+        for item in config.get("recent_database_paths", [])
+        if item and item != resolved
+    ]
     save_config(config)
 
 

@@ -186,6 +186,47 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
 }
 
+QMenuBar {
+    background-color: #1a1b26;
+    color: #c0caf5;
+    border-bottom: 1px solid #32364a;
+    padding: 4px 8px;
+    spacing: 4px;
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+QMenuBar::item:selected {
+    background-color: #414868;
+}
+
+QMenu {
+    background-color: #24283b;
+    color: #c0caf5;
+    border: 1px solid #414868;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+QMenu::item {
+    padding: 8px 28px 8px 16px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: #414868;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #414868;
+    margin: 6px 8px;
+}
+
 QDialog {
     background-color: #1a1b26;
 }

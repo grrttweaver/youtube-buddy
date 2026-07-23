@@ -32,11 +32,7 @@ class VideoTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._videos = list(videos)
         self._checked_ids.clear()
-        self._thumbnails = {
-            video.id: pixmap
-            for video in self._videos
-            if (pixmap := self._thumbnails.get(video.id)) is not None
-        }
+        self._thumbnails = {}
         self.endResetModel()
         self.selection_changed.emit()
 

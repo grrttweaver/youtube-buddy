@@ -3,16 +3,28 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QUrl, QSize, Qt
-from PyQt6.QtGui import QDesktopServices, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QImage, QPixmap, QResizeEvent
+from PyQt6.QtGui import (
+    QDesktopServices,
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDropEvent,
+    QImage,
+    QKeySequence,
+    QPixmap,
+    QResizeEvent,
+)
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QStatusBar,
     QVBoxLayout,
@@ -21,7 +33,13 @@ from PyQt6.QtWidgets import (
 
 from youtube_buddy.action_delegate import ActionButtonDelegate
 from youtube_buddy.checkbox_delegate import CheckboxDelegate
-from youtube_buddy.config import get_window_geometry, set_window_geometry
+from youtube_buddy.config import (
+    get_recent_database_paths,
+    get_window_geometry,
+    remember_database,
+    remove_recent_database,
+    set_window_geometry,
+)
 from youtube_buddy.database import Database, Video
 from youtube_buddy.drop_overlay import DropOverlay
 from youtube_buddy.import_queue import ImportQueueWidget
@@ -57,6 +75,8 @@ class MainWindow(QMainWindow):
         self._pending_urls: set[str] = set()
         self._drop_hover_count = 0
         self._remove_confirm_pending = False
+
+        self._build_menu()
 
         self.model = VideoTableModel(self)
         self.model.set_videos(database.list_videos())
@@ -171,6 +191,128 @@ class MainWindow(QMainWindow):
         self._position_drop_overlay()
 
         self._load_thumbnails_for_all()
+
+    def _build_menu(self) -> None:
+        self._file_menu = self.menuBar().addMenu("&File")
+
+        open_action = self._file_menu.addAction("&Open Database…")
+        open_action.setShortcut(QKeySequence.StandardKey.Open)
+        open_action.triggered.connect(self._open_database)
+
+        new_action = self._file_menu.addAction("&New Database…")
+        new_action.triggered.connect(self._new_database)
+
+        self._recent_separator = self._file_menu.addSeparator()
+        self._recent_actions: list = []
+        self._rebuild_recent_menu()
+
+    def _rebuild_recent_menu(self) -> None:
+        for action in self._recent_actions:
+            self._file_menu.removeAction(action)
+            action.deleteLater()
+        self._recent_actions.clear()
+
+        recent_paths = get_recent_database_paths()
+        current_path = self.database.path.resolve()
+        visible_paths = [
+            path
+            for path in recent_paths
+            if path.exists() and path.resolve() != current_path
+        ]
+
+        self._recent_separator.setVisible(bool(visible_paths))
+        shortcut_prefix = "Meta" if sys.platform == "darwin" else "Ctrl"
+        for index, path in enumerate(visible_paths, start=1):
+            action = self._file_menu.addAction(path.name)
+            action.setToolTip(str(path))
+            if index <= 9:
+                action.setShortcut(QKeySequence(f"{shortcut_prefix}+{index}"))
+            action.triggered.connect(
+                lambda _checked=False, selected_path=path: self._open_database_at(
+                    selected_path
+                )
+            )
+            self._recent_actions.append(action)
+
+    def _open_database(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Playlist Database",
+            str(self.database.path.parent),
+            "SQLite Database (*.db);;All Files (*)",
+        )
+        if path:
+            self._open_database_at(Path(path))
+
+    def _new_database(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Create Playlist Database",
+            str(Path.home() / "youtube-buddy-playlist.db"),
+            "SQLite Database (*.db);;All Files (*)",
+        )
+        if not path:
+            return
+
+        db_path = Path(path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._open_database_at(db_path)
+
+    def _open_database_at(self, path: Path) -> None:
+        resolved = path.resolve()
+        if resolved == self.database.path.resolve():
+            return
+
+        if not resolved.exists():
+            remove_recent_database(resolved)
+            self._rebuild_recent_menu()
+            QMessageBox.warning(
+                self,
+                "Database Not Found",
+                f"The playlist database could not be found:\n{resolved}",
+            )
+            return
+
+        if self._pending_urls and not self._confirm_cancel_imports():
+            return
+
+        self._cancel_pending_imports()
+        self._thumbnail_loader.clear()
+        self.database.close()
+        self.database = Database(resolved)
+        remember_database(resolved)
+
+        self.model.set_videos(self.database.list_videos())
+        self._cancel_remove_confirmation()
+        self._update_selection_toolbar()
+        self._load_thumbnails_for_all()
+        self._rebuild_recent_menu()
+        self._set_status(f"{len(self.model.videos())} videos in playlist")
+
+    def _confirm_cancel_imports(self) -> bool:
+        count = len(self._pending_urls)
+        noun = "import" if count == 1 else "imports"
+        answer = QMessageBox.question(
+            self,
+            "Switch Database",
+            f"{count} {noun} still in progress.\n\n"
+            "Switch databases anyway? Pending imports will be cancelled.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def _cancel_pending_imports(self) -> None:
+        for worker in list(self._metadata_workers):
+            worker.finished_with_result.disconnect()
+            worker.failed.disconnect()
+            worker.finished.disconnect()
+            if worker.isRunning():
+                worker.wait(3000)
+            worker.deleteLater()
+        self._metadata_workers.clear()
+        self._pending_urls.clear()
+        self.import_queue.clear()
 
     def _restore_window_geometry(self) -> None:
         geometry = get_window_geometry()

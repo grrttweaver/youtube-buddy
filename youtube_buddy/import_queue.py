@@ -136,6 +136,13 @@ class ImportQueueWidget(QWidget):
 
         QTimer.singleShot(5000, lambda url=url: self.remove(url))
 
+    def clear(self) -> None:
+        for row in list(self._rows.values()):
+            self.rows_layout.removeWidget(row)
+            row.deleteLater()
+        self._rows.clear()
+        self.hide()
+
     def _refresh(self) -> None:
         count = len(self._rows)
         if count == 0:

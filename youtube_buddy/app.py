@@ -9,7 +9,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from youtube_buddy.assets import APP_ICON_PATH
-from youtube_buddy.config import get_database_path, set_database_path
+from youtube_buddy.config import get_database_path, remember_database
 from youtube_buddy.database import Database
 from youtube_buddy.main_window import MainWindow
 from youtube_buddy.macos_glass import apply_macos_glass, is_macos
@@ -20,6 +20,7 @@ from youtube_buddy.styles import get_stylesheet
 def resolve_database_path(parent) -> Path | None:
     existing = get_database_path()
     if existing and existing.exists():
+        remember_database(existing)
         return existing
 
     if existing and not existing.exists():
@@ -41,7 +42,7 @@ def resolve_database_path(parent) -> Path | None:
     if path is None:
         return None
 
-    set_database_path(path)
+    remember_database(path)
     return path
 
 
