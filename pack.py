@@ -59,6 +59,30 @@ def ensure_pyinstaller() -> None:
         ) from exc
 
 
+def ensure_runtime_deps(target: str) -> None:
+    import importlib.util
+
+    required = [
+        ("PyQt6", "PyQt6"),
+        ("yt_dlp", "yt-dlp"),
+        ("platformdirs", "platformdirs"),
+    ]
+    if target == "macos":
+        required.append(("pyqt_liquidglass", "pyqt-liquidglass"))
+
+    missing: list[str] = []
+    for module, pip_name in required:
+        if importlib.util.find_spec(module) is None:
+            missing.append(pip_name)
+
+    if missing:
+        raise SystemExit(
+            "Missing runtime dependencies required for packaging:\n"
+            + "\n".join(f"  - {name}" for name in missing)
+            + "\n\nInstall with:\n  pip install -r requirements-packaging.txt"
+        )
+
+
 def run(cmd: list[str], *, cwd: Path | None = None) -> None:
     print(f"+ {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd or ROOT, check=True)
@@ -197,24 +221,44 @@ def executable_name(target: str) -> str:
     return "YouTube-Buddy" if target == "windows" else APP_SLUG
 
 
+def pyinstaller_name(target: str) -> str:
+    return APP_NAME if target == "macos" else executable_name(target)
+
+
+def bundled_icon_path(target: str) -> Path:
+    if target == "macos":
+        return shaped_icon_png()
+    icon_png = ASSETS / "icon.png"
+    if not icon_png.exists():
+        raise SystemExit(f"Missing app icon: {icon_png}")
+    return icon_png
+
+
+def pyinstaller_spec_path(target: str) -> Path:
+    return PACKAGING / "pyinstaller" / f"{pyinstaller_name(target)}.spec"
+
+
+def remove_stale_pyinstaller_spec(target: str) -> None:
+    """Remove a cached spec so CLI collect/hidden-import flags are applied."""
+    spec = pyinstaller_spec_path(target)
+    if spec.exists():
+        print(f"Removing stale PyInstaller spec: {spec}")
+        spec.unlink()
+
+
 def pyinstaller_command(target: str, *, onefile: bool, clean: bool) -> list[str]:
     sep = data_separator(target)
-    icon_source = shaped_icon_png()
-    icon_data = f"{icon_source}{sep}assets"
+    icon_data = f"{bundled_icon_path(target)}{sep}assets"
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
         str(ENTRYPOINT),
         "--name",
-        APP_NAME if target == "macos" else executable_name(target),
+        pyinstaller_name(target),
         "--windowed",
         "--noconfirm",
         f"--add-data={icon_data}",
-        "--collect-all",
-        "PyQt6",
-        "--collect-all",
-        "yt_dlp",
         "--specpath",
         str(PACKAGING / "pyinstaller"),
         "--distpath",
@@ -222,6 +266,9 @@ def pyinstaller_command(target: str, *, onefile: bool, clean: bool) -> list[str]
         "--workpath",
         str(BUILD),
     ]
+
+    for package in ("PyQt6", "PyQt6-Qt6", "yt_dlp"):
+        cmd.extend(["--collect-all", package])
 
     for hidden_import in hidden_imports_for(target):
         cmd.extend(["--hidden-import", hidden_import])
@@ -261,8 +308,10 @@ def build_pyinstaller(target: str, *, onefile: bool, clean: bool) -> Path:
         )
 
     ensure_pyinstaller()
+    ensure_runtime_deps(target)
     BUILD.mkdir(parents=True, exist_ok=True)
     DIST.mkdir(parents=True, exist_ok=True)
+    remove_stale_pyinstaller_spec(target)
     run(pyinstaller_command(target, onefile=onefile, clean=clean))
 
     artifact = artifact_path(target, onefile=onefile)
