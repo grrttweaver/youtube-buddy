@@ -51,23 +51,26 @@ def traffic_light_vertical_metrics(
     except ImportError:
         return None
 
-    ns_window = get_nswindow_from_widget(window)
-    if ns_window is None:
-        return None
+    try:
+        ns_window = get_nswindow_from_widget(window)
+        if ns_window is None:
+            return None
 
-    close_btn = ns_window.standardWindowButton_(0)  # ty: ignore
-    if close_btn is None:
-        return None
+        close_btn = ns_window.standardWindowButton_(0)  # ty: ignore
+        if close_btn is None:
+            return None
 
-    titlebar = close_btn.superview()  # ty: ignore
-    if titlebar is None:
-        return None
+        titlebar = close_btn.superview()  # ty: ignore
+        if titlebar is None:
+            return None
 
-    _, btn_y, _, btn_height = _ns_rect_metrics(close_btn.frame())  # ty: ignore
-    _, _, _, titlebar_height = _ns_rect_metrics(titlebar.frame())  # ty: ignore
-    btn_top = int(titlebar_height - (btn_y + btn_height))
-    btn_bottom = int(titlebar_height - btn_y)
-    return btn_top, btn_bottom
+        _, btn_y, _, btn_height = _ns_rect_metrics(close_btn.frame())  # ty: ignore
+        _, _, _, titlebar_height = _ns_rect_metrics(titlebar.frame())  # ty: ignore
+        btn_top = int(titlebar_height - (btn_y + btn_height))
+        btn_bottom = int(titlebar_height - btn_y)
+        return btn_top, btn_bottom
+    except Exception:
+        return None
 
 
 def configure_macos_window_drag(window: QMainWindow) -> None:

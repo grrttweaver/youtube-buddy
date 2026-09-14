@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QTableView,
 )
 
+from youtube_buddy.video_model import MIME_TYPE
+
 
 HOVER_COLOR = (
     QColor(42, 49, 80)
@@ -104,6 +106,18 @@ class HoverTableView(QTableView):
         super().scrollContentsBy(dx, dy)
         if sys.platform == "darwin" and dy:
             self.viewport().repaint()
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802
+        if event.mimeData().hasFormat(MIME_TYPE):
+            super().dragEnterEvent(event)
+            return
+        event.ignore()
+
+    def dropEvent(self, event) -> None:  # noqa: N802
+        if event.mimeData().hasFormat(MIME_TYPE):
+            super().dropEvent(event)
+            return
+        event.ignore()
 
     @property
     def hover_row(self) -> int:

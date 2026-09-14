@@ -143,7 +143,10 @@ class SelectionToolbar(QWidget):
 
         self.setFixedHeight(self.HEIGHT)
         self.setMaximumWidth(16777215)
-        self.show()
+
+    def prepare_expanded(self) -> None:
+        self.setFixedHeight(self.HEIGHT)
+        self.setMaximumWidth(16777215)
 
 
 class MainWindow(QMainWindow):
@@ -160,6 +163,7 @@ class MainWindow(QMainWindow):
         self._drop_hover_count = 0
         self._remove_confirm_pending = False
         self._window_drag_offset: QPoint | None = None
+        self._processing_drop = False
 
         self._build_menu()
 
@@ -270,13 +274,21 @@ class MainWindow(QMainWindow):
 
         self.setAcceptDrops(True)
         self._central.setAcceptDrops(True)
-        self._install_drop_forwarding(self._central)
 
         self.drop_overlay = DropOverlay(self._central)
         self._position_drop_overlay()
 
+        self._drop_target_widgets = (
+            self._central,
+            self.url_input,
+            self.import_queue,
+            self.table,
+            self.table.viewport(),
+        )
+        for widget in self._drop_target_widgets:
+            widget.installEventFilter(self)
+
         if sys.platform == "darwin":
-            self._central.installEventFilter(self)
             self._drag_region.installEventFilter(self)
 
         self._load_thumbnails_for_all()
@@ -338,7 +350,6 @@ class MainWindow(QMainWindow):
         cover.show()
         cover.raise_()
         cover.repaint()
-        QApplication.processEvents()
         return cover
 
     def _repaint_content_band(self) -> None:
@@ -352,7 +363,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
         if sys.platform == "darwin":
-            self._sync_macos_top_margin()
+            QTimer.singleShot(0, self._sync_macos_top_margin)
         self._position_drop_overlay()
 
     def _top_chrome_bottom(self) -> int:
@@ -536,11 +547,6 @@ class MainWindow(QMainWindow):
             return
         self.resize(860, 620)
 
-    def _install_drop_forwarding(self, widget: QWidget) -> None:
-        widget.installEventFilter(self)
-        for child in widget.findChildren(QWidget):
-            child.installEventFilter(self)
-
     def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:  # noqa: N802
         self._hide_drop_overlay()
         super().dragLeaveEvent(event)
@@ -549,11 +555,11 @@ class MainWindow(QMainWindow):
         self.drop_overlay.setGeometry(self._central.rect())
 
     def _show_drop_overlay(self) -> None:
-        self._drop_hover_count += 1
-        if self._drop_hover_count == 1:
+        if self._drop_hover_count == 0:
             self._position_drop_overlay()
             self.drop_overlay.show()
             self.drop_overlay.raise_()
+        self._drop_hover_count += 1
 
     def _hide_drop_overlay(self) -> None:
         if self._drop_hover_count <= 0:
@@ -590,19 +596,26 @@ class MainWindow(QMainWindow):
                         self._central.unsetCursor()
 
         if event.type() == QEvent.Type.DragEnter:
+            if obj not in self._drop_target_widgets:
+                return super().eventFilter(obj, event)
             handled = self._handle_drag_enter(event)
             if handled:
                 self._show_drop_overlay()
             return handled
         if event.type() == QEvent.Type.DragMove:
+            if obj not in self._drop_target_widgets:
+                return super().eventFilter(obj, event)
             if self._mime_has_media_url(event.mimeData()):
                 event.acceptProposedAction()
                 return True
             return False
         if event.type() == QEvent.Type.DragLeave:
-            self._hide_drop_overlay()
+            if obj is self._central:
+                self._hide_drop_overlay()
             return False
         if event.type() == QEvent.Type.Drop:
+            if obj not in self._drop_target_widgets:
+                return super().eventFilter(obj, event)
             handled = self._handle_drop(event)
             self._reset_drop_overlay()
             return handled
@@ -629,15 +642,25 @@ class MainWindow(QMainWindow):
         return False
 
     def _handle_drop(self, event) -> bool:
-        mime = event.mimeData()
-        if mime.hasFormat(MIME_TYPE):
+        if self._processing_drop:
+            return True
+
+        self._processing_drop = True
+        try:
+            mime = event.mimeData()
+            if mime.hasFormat(MIME_TYPE):
+                return False
+            url = self._url_from_mime(mime)
+            if not url:
+                return False
+            event.acceptProposedAction()
+            self.add_video_url(url)
+            return True
+        except Exception:
+            self._set_status("Could not add that link.", error=True)
             return False
-        url = self._url_from_mime(mime)
-        if not url:
-            return False
-        event.acceptProposedAction()
-        self.add_video_url(url)
-        return True
+        finally:
+            self._processing_drop = False
 
     @staticmethod
     def _mime_has_media_url(mime) -> bool:
@@ -778,20 +801,20 @@ class MainWindow(QMainWindow):
             )
 
             self.table.setUpdatesEnabled(False)
-            self.selection_toolbar.set_collapsed(False)
+            self.selection_toolbar.setParent(self._central)
+            self.selection_toolbar.prepare_expanded()
             table_index = self._content_layout.indexOf(self.table)
             self._content_layout.insertWidget(table_index, self.selection_toolbar)
             self._selection_toolbar_in_layout = True
             self._content_layout.activate()
             self._central.updateGeometry()
-            QApplication.processEvents()
 
             if sys.platform == "darwin":
                 cover = self._macos_erase_content_band(stale_top, erase_height)
-                QApplication.processEvents()
             else:
                 cover = None
 
+            self.selection_toolbar.show()
             self.table.setUpdatesEnabled(True)
             self.table.scrollTo(self.model.index(0, 0))
             self.table.viewport().repaint()
@@ -814,14 +837,12 @@ class MainWindow(QMainWindow):
             self._selection_toolbar_in_layout = False
             self._content_layout.activate()
             self._central.updateGeometry()
-            QApplication.processEvents()
 
             if sys.platform == "darwin":
                 cover = self._macos_erase_content_band(
                     max(0, stale_top - shift),
                     erase_height,
                 )
-                QApplication.processEvents()
             else:
                 cover = None
 
